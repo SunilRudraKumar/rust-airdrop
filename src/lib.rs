@@ -1,14 +1,12 @@
 pub mod programs;
-use crate::programs::turbin3_prereq::{CompleteArgs, WbaPrereqProgram};
+use crate::programs::turbin3_prereq::{CompleteArgs, Turbin3PrereqProgram};
+use bs58;
 use solana_client::rpc_client::RpcClient;
 use solana_program::system_program;
-use solana_sdk::message::Message;
-use solana_sdk::signer::keypair::read_keypair_file;
+use solana_program::{pubkey::Pubkey, system_instruction::transfer};
 use solana_sdk::{
-    bs58,
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-    system_instruction::transfer,
+    message::Message,
+    signature::{read_keypair_file, Keypair, Signer},
     transaction::Transaction,
 };
 use std::io::{self, BufRead};
@@ -142,21 +140,25 @@ mod tests {
     }
 
     #[test]
-    fn enroll_turbin3() {
+    fn test_prereq() {
         let rpc_client = RpcClient::new(RPC_URL);
-        let signer = read_keypair_file("my-wallet.json").expect("Couldn't find wallet file");
-        let prereq = WbaPrereqProgram::derive_program_address(&[
+
+        let signer = read_keypair_file("my-wallet.json").unwrap();
+
+        let prereq = Turbin3PrereqProgram::derive_program_address(&[
             b"prereq",
             signer.pubkey().to_bytes().as_ref(),
         ]);
+
         let args = CompleteArgs {
             github: b"SunilRudraKumar".to_vec(),
         };
+
         let blockhash = rpc_client
             .get_latest_blockhash()
-            .expect("Failed to get blockhash");
+            .expect("Failed to get recent blockhash");
 
-        let transaction = WbaPrereqProgram::complete(
+        let transaction = Turbin3PrereqProgram::complete(
             &[&signer.pubkey(), &prereq, &system_program::id()],
             &args,
             Some(&signer.pubkey()),
@@ -164,12 +166,13 @@ mod tests {
             blockhash,
         );
 
-        match rpc_client.send_and_confirm_transaction(&transaction) {
-            Ok(signature) => println!(
-                "Enrollment successful! TX: https://explorer.solana.com/tx/{}?cluster=devnet",
-                signature
-            ),
-            Err(e) => println!("Failed to enroll: {}", e),
-        }
+        let signature = rpc_client
+            .send_and_confirm_transaction(&transaction)
+            .expect("Failed to send transaction");
+
+        println!(
+            "Success! Check out your TX here: https://explorer.solana.com/tx/{}/?cluster=devnet",
+            signature
+        );
     }
 }
